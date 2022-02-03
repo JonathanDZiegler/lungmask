@@ -191,7 +191,7 @@ def get_input_image(path):
     return input_image
 
 
-def postrocessing(label_image, spare=[]):
+def postrocessing(label_image, spare=[], verbose=False):
     '''some post-processing mapping small label patches to the neighbout whith which they share the
         largest border. All connected components smaller than min_area will be removed
     '''
@@ -212,7 +212,7 @@ def postrocessing(label_image, spare=[]):
             origlabels_maxsub[r_max_intensity] = r.area
             region_to_lobemap[r.label] = r_max_intensity
 
-    for r in tqdm(regions):
+    for r in tqdm(regions, disable=(not verbose)):
         r_max_intensity = int(r.max_intensity)
         if (r.area < origlabels_maxsub[r_max_intensity] or r_max_intensity in spare) and r.area>2: # area>2 improves runtime because small areas 1 and 2 voxel will be ignored
             bb = bbox_3D(regionmask == r.label)
