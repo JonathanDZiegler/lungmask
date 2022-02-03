@@ -20,7 +20,7 @@ model_urls = {('unet', 'R231'): ('https://github.com/JoHof/lungmask/releases/dow
                   'https://github.com/JoHof/lungmask/releases/download/v0.0/unet_r231covid-0de78a7e.pth', 3)}
 
 
-def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False):
+def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False, verbose=False):
     if model is None:
         model = get_model('unet', 'R231')
     
@@ -64,7 +64,7 @@ def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessi
     timage_res = np.empty((np.append(0, tvolslices[0].shape)), dtype=np.uint8)
 
     with torch.no_grad():
-        for X in tqdm(dataloader_val):
+        for X in tqdm(dataloader_val, disable=(not verbose)):
             X = X.float().to(device)
             prediction = model(X)
             pls = torch.max(prediction, 1)[1].detach().cpu().numpy().astype(np.uint8)
@@ -73,7 +73,7 @@ def apply(image, model=None, force_cpu=False, batch_size=20, volume_postprocessi
     # postprocessing includes removal of small connected components, hole filling and mapping of small components to
     # neighbors
     if volume_postprocessing:
-        outmask = utils.postrocessing(timage_res)
+        outmask = utils.postrocessing(timage_res, verbose=verbose)
     else:
         outmask = timage_res
 
@@ -109,16 +109,16 @@ def get_model(modeltype, modelname, modelpath=None, n_classes=3):
     return model
 
 
-def apply_fused(image, basemodel = 'LTRCLobes', fillmodel = 'R231', force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False):
+def apply_fused(image, basemodel = 'LTRCLobes', fillmodel = 'R231', force_cpu=False, batch_size=20, volume_postprocessing=True, noHU=False, verbose=False):
     '''Will apply basemodel and use fillmodel to mitiage false negatives'''
     mdl_r = get_model('unet',fillmodel)
     mdl_l = get_model('unet',basemodel)
     logging.info("Apply: %s" % basemodel)
-    res_l = apply(image, mdl_l, force_cpu=force_cpu, batch_size=batch_size,  volume_postprocessing=volume_postprocessing, noHU=noHU)
+    res_l = apply(image, mdl_l, force_cpu=force_cpu, batch_size=batch_size,  volume_postprocessing=volume_postprocessing, noHU=noHU, verbose=verbose)
     logging.info("Apply: %s" % fillmodel)
-    res_r = apply(image, mdl_r, force_cpu=force_cpu, batch_size=batch_size,  volume_postprocessing=volume_postprocessing, noHU=noHU)
+    res_r = apply(image, mdl_r, force_cpu=force_cpu, batch_size=batch_size,  volume_postprocessing=volume_postprocessing, noHU=noHU, verbose=verbose)
     spare_value = res_l.max()+1
     res_l[np.logical_and(res_l==0, res_r>0)] = spare_value
     res_l[res_r==0] = 0
     logging.info("Fusing results... this may take up to several minutes!")
-    return utils.postrocessing(res_l, spare=[spare_value])
+    return utils.postrocessing(res_l, spare=[spare_value], verbose=verbose)
